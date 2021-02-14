@@ -157,8 +157,12 @@ if len(sys.argv)>3 and sys.argv[1] == 'translate':
     (sourceWord2ind,targetWord2ind) = pickle.load(open(wordsDataFileName, 'rb'))
 
     sourceTest = utils.readCorpus(sys.argv[2])
-
-    nmt = model.NMTmodel(parameter1, parameter2, parameter3,  parameter4).to(device)
+    #model = nn.DataParallel(model)
+    encoder = model.Encoder (len(sourceWord2ind), embedding_size, hidden_size, sourceWord2ind, unkToken, padToken, endToken).to(device)
+    input_size_decoder = len(targetWord2ind)
+    print (input_size_decoder)
+    decoder = model.Decoder (input_size_decoder, embedding_size, hidden_size,input_size_decoder,targetWord2ind, unkToken, padToken, endToken).to(device)
+    nmt = model.NMTmodel(encoder, decoder,targetWord2ind, sourceWord2ind).to(device)
     nmt.load(modelFileName)
 
     nmt.eval()
@@ -166,7 +170,9 @@ if len(sys.argv)>3 and sys.argv[1] == 'translate':
     pb = utils.progressBar()
     pb.start(len(sourceTest))
     for s in sourceTest:
-        file.write(' '.join(nmt.translateSentence(s))+"\n")
+        #file.write
+        print(s)
+        print((' '.join(nmt.translateSentence(s))+"\n"))
         pb.tick()
     pb.stop()
 

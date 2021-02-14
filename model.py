@@ -59,6 +59,7 @@ class Decoder(torch.nn.Module):
         self.unkTokenIdx = word2ind[unkToken]
         self.padTokenIdx = word2ind[padToken]
         self.endTokenIdx = word2ind[endToken]
+        self.word2ind = word2ind
         self.embedding =  torch.nn.Embedding(input_size, embedding_size)
         print(embedding_size, input_size, output_size)
         self.lstm =  torch.nn.LSTM(embedding_size, hidden_size , num_layers=1 )
@@ -135,5 +136,54 @@ class NMTmodel(torch.nn.Module):
         output = torch.nn.functional.cross_entropy(output,target,ignore_index=self.decoder.padTokenIdx)
         return output
 
-    def translateSentence(self, sentence, limit=1000):
-        return result
+    def translateSentence(self, sentence, max_length=1000):
+    # print(sentence)
+
+    # sys.exit()
+        def getWordFromIdx(dictionary, idx):
+            if idx in dictionary.keys():
+                return dictionary[idx]
+            return 2
+    # Load german tokenizer
+        english = self.encoder.word2ind
+        bulgarian = self.decoder.word2ind
+        #print(english)
+        # Create tokens using spacy and everything in lower case (which is what our vocab is)
+        #print(english["IMF"])
+        #toLower = lambda s: s[:1].lower() + s[1:] if s else ''
+        tokens = [getWordFromIdx(english, word) for word in sentence]
+        # print(tokens)
+        print(tokens)
+        # sys.exit()
+        # Add <SOS> and <EOS> in beginning and end respectively
+        tokens.insert(0, english["<S>"])
+        tokens.append(english["</S>"])
+
+        # Convert to Tensor
+        sentence_tensor = torch.LongTensor(tokens).unsqueeze(1).to(device)
+
+        # Build encoder hidden, cell state
+        with torch.no_grad():
+            hidden, cell = self.encoder(sentence_tensor)
+
+        outputs = [bulgarian[startToken]]
+
+        for _ in range(max_length):
+            previous_word = torch.LongTensor([outputs[-1]]).to(device)
+
+            with torch.no_grad():
+                output, hidden, cell = self.decoder(previous_word, hidden, cell)
+                best_guess = output.argmax(1).item()
+
+            outputs.append(best_guess)
+
+            # Model predicts it's the end of the sentence
+            if output.argmax(1).item() == english["</S>"]:
+                break
+        #print(outputs)
+        #print(bulgarian)
+        revBulgarian ={v:k for k, v in bulgarian.items()}
+        translated_sentence = [revBulgarian[idx] for idx in outputs]
+
+    # remove start token
+        return translated_sentence[1:]

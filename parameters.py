@@ -9,6 +9,10 @@ corpusDataFileName = 'corpusData'
 wordsDataFileName = 'wordsData'
 modelFileName = 'NMTmodel'
 
+startToken = '<S>'
+endToken = '</S>'
+unkToken = '<UNK>'
+padToken = '<PAD>'
 
 #device = torch.device("cuda:0")
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -24,12 +28,12 @@ learning_rate = 0.001
 clip_grad = 5.0
 learning_rate_decay = 0.5
 
-batchSize = 15
+batchSize = 32
 
 embedding_size=32
 hidden_size=512
 
-maxEpochs = 3
+maxEpochs = 1
 log_every = 10
 test_every = 2000
 
