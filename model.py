@@ -186,7 +186,7 @@ class NMTmodel(torch.nn.Module):
 
         # Build encoder hidden, cell state
         with torch.no_grad():
-            hidden, cell = self.encoder(sentence_tensor)
+            enc_res, (hidden, cell) = self.encoder(sentence_tensor)
 
         outputs = [bulgarian[startToken]]
 
@@ -194,7 +194,7 @@ class NMTmodel(torch.nn.Module):
             previous_word = torch.LongTensor([outputs[-1]]).to(device)
 
             with torch.no_grad():
-                output, hidden, cell = self.decoder(previous_word, hidden, cell)
+                output, hidden, cell = self.decoder(previous_word,enc_res,  hidden, cell)
                 best_guess = output.argmax(1).item()
 
             outputs.append(best_guess)

@@ -30,7 +30,7 @@ learning_rate_decay = 0.5
 
 batchSize = 8
 
-embedding_size=128
+embedding_size=32
 hidden_size=512
 
 maxEpochs = 3
