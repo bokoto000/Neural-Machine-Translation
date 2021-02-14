@@ -41,7 +41,7 @@ class Encoder(torch.nn.Module):
         embedding = self.embedding(input)
         
         output, (hidden, cell) = self.lstm(embedding)
-        return output, hidden
+        return output, (hidden , cell)
 
 class Decoder(torch.nn.Module):
     def preparePaddedBatch(self, source, word2ind):
@@ -61,26 +61,48 @@ class Decoder(torch.nn.Module):
         self.endTokenIdx = word2ind[endToken]
         self.word2ind = word2ind
         self.embedding =  torch.nn.Embedding(input_size, embedding_size)
-        print(embedding_size, input_size, output_size)
-        self.lstm =  torch.nn.LSTM(embedding_size, hidden_size , num_layers=1 )
+        #print(embedding_size, input_size, output_size)
+        self.lstm =  torch.nn.LSTM(hidden_size+embedding_size, hidden_size , num_layers=1 )
         self.fc =  torch.nn.Linear(hidden_size, output_size)
+        self.energy = torch.nn.Linear(hidden_size * 2, 1024)
+        self.relu = torch.nn.ReLU()
+        self.softmax = torch.nn.Softmax(dim=0)
 
+    def forward(self, input, encoder_states, hidden, cell):
+        x = input.unsqueeze(0)
+        # x: (1, N) where N is the batch size
 
-    def forward(self, input, hidden, cell):
-        input = input.unsqueeze(0)
-        #shape of x:(N) but we want (1,N)
-        #print("input shape", input.shape)
-        embedding = self.embedding(input)
-        #print("embed shape", embedding.shape)
-        hiddenLastLayer = (hidden.shape)[0]-1
-        hidden = hidden[hiddenLastLayer]
-        hidden = hidden.unsqueeze(0)
-        #print(hidden.shape)
-        #print("emb",embedding.shape)
-        output, (hidden, cell) = self.lstm(embedding, (hidden, cell))
-        #print("output shape", output.shape)
-        predictions = self.fc(output)
-        predictions = predictions.squeeze(0)
+        embedding = self.embedding(x)
+        # embedding shape: (1, N, embedding_size)
+
+        sequence_length = encoder_states.shape[0]
+        h_reshaped = hidden.repeat(sequence_length, 1, 1)
+        # h_reshaped: (seq_length, N, hidden_size*2)
+        #print(h_reshaped.shape, encoder_states.shape)
+        cat = torch.cat((h_reshaped, encoder_states), dim=2)
+        #print(cat.shape)
+        en = self.energy(cat)
+        #print(en.shape)
+        energy = self.relu(self.energy(cat))
+        # energy: (seq_length, N, 1)
+
+        attention = self.softmax(energy)
+        # attention: (seq_length, N, 1)
+
+        # attention: (seq_length, N, 1), snk
+        # encoder_states: (seq_length, N, hidden_size*2), snl
+        # we want context_vector: (1, N, hidden_size*2), i.e knl
+        context_vector = torch.einsum("snk,snl->knl", attention, encoder_states)
+        #print(context_vector[-1].unsqueeze(0).shape, embedding.shape)
+        rnn_input = torch.cat((context_vector[-1].unsqueeze(0), embedding), dim=2)
+        # rnn_input: (1, N, hidden_size*2 + embedding_size)
+        #print(rnn_input.shape)
+        outputs, (hidden, cell) = self.lstm(rnn_input, (hidden, cell))
+        # outputs shape: (1, N, hidden_size)
+
+        predictions = self.fc(outputs).squeeze(0)
+        # predictions: (N, hidden_size)
+
         return predictions, hidden, cell
 
 
@@ -116,11 +138,11 @@ class NMTmodel(torch.nn.Module):
         #print(target_vocab_size)
         outputs = torch.zeros(target_len, batch_size, target_vocab_size).to(device)
         #print(source)
-        hidden, cell = self.encoder(source)
+        encoder_states,(hidden,  cell) = self.encoder(source)
         x=target[0]
         
         for t in range( 1, target_len):
-            output, hidden, cell = self.decoder (x,hidden, cell)
+            output, hidden, cell = self.decoder (x, encoder_states, hidden,cell)
             #print(output.shape)
             #print()
             outputs[t]= output
@@ -153,7 +175,7 @@ class NMTmodel(torch.nn.Module):
         #toLower = lambda s: s[:1].lower() + s[1:] if s else ''
         tokens = [getWordFromIdx(english, word) for word in sentence]
         # print(tokens)
-        print(tokens)
+        #print(tokens)
         # sys.exit()
         # Add <SOS> and <EOS> in beginning and end respectively
         tokens.insert(0, english["<S>"])

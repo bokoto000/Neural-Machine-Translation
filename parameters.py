@@ -28,7 +28,7 @@ learning_rate = 0.001
 clip_grad = 5.0
 learning_rate_decay = 0.5
 
-batchSize = 32
+batchSize = 16
 
 embedding_size=32
 hidden_size=512
