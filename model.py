@@ -22,14 +22,14 @@ class Encoder(torch.nn.Module):
         #print("encoder x", x.shape)
         return torch.t(torch.tensor(sents_padded, dtype=torch.long, device=device))
     
-    def __init__(self, input_size, embedding_size, hidden_size, word2ind , unkToken, padToken, endToken):
+    def __init__(self, input_size, embedding_size, hidden_size, word2ind , unkToken, padToken, endToken, dropout=0.3):
         super(Encoder, self).__init__()
         self.word2ind = word2ind
         self.unkTokenIdx = word2ind[unkToken]
         self.padTokenIdx = word2ind[padToken]
         self.endTokenIdx = word2ind[endToken]
         self.hidden_size = hidden_size
-
+        self.dropout = torch.nn.Dropout(dropout)
         self.embedding = torch.nn.Embedding(input_size, embedding_size)
         self.lstm =  torch.nn.LSTM(embedding_size, hidden_size)
         self.dropout = torch.nn.Dropout(0)
@@ -53,13 +53,14 @@ class Decoder(torch.nn.Module):
         #print("decoder x", x.shape)
         return x
     
-    def __init__(self, input_size, embedding_size, hidden_size, output_size,word2ind,unkToken, padToken, endToken):
+    def __init__(self, input_size, embedding_size, hidden_size, output_size,word2ind,unkToken, padToken, endToken, dropout=0.3):
         super(Decoder, self).__init__()
         self.hidden_size = hidden_size
         self.unkTokenIdx = word2ind[unkToken]
         self.padTokenIdx = word2ind[padToken]
         self.endTokenIdx = word2ind[endToken]
         self.word2ind = word2ind
+        self.dropout = torch.nn.Dropout(dropout)
         self.embedding =  torch.nn.Embedding(input_size, embedding_size)
         #print(embedding_size, input_size, output_size)
         self.lstm =  torch.nn.LSTM(hidden_size+embedding_size, hidden_size , num_layers=1 )
@@ -73,6 +74,7 @@ class Decoder(torch.nn.Module):
         # x: (1, N) where N is the batch size
 
         embedding = self.embedding(x)
+        embedding = self.dropout(embedding)
         # embedding shape: (1, N, embedding_size)
 
         sequence_length = encoder_states.shape[0]
