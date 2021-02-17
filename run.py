@@ -44,19 +44,13 @@ if len(sys.argv)>1 and sys.argv[1] == 'prepare':
     pickle.dump((sourceCorpus,targetCorpus,sourceDev,targetDev), open(corpusDataFileName, 'wb'))
     pickle.dump((sourceWord2ind,targetWord2ind), open(wordsDataFileName, 'wb'))
     print('Data prepared.')
-#sourceWord2Ind encoder dictionary
-#targetWord2ind decoder dictionary
 
 if len(sys.argv)>1 and (sys.argv[1] == 'train' or sys.argv[1] == 'extratrain'):
     (sourceCorpus,targetCorpus,sourceDev,targetDev) = pickle.load(open(corpusDataFileName, 'rb'))
     (sourceWord2ind,targetWord2ind) = pickle.load(open(wordsDataFileName, 'rb'))
-    #sourceWord2ind = set( sourceWord2ind)
-    #targetWord2ind = set (targetWord2ind)
-    encoder = model.Encoder (len(sourceWord2ind), embedding_size, hidden_size, sourceWord2ind, unkToken, padToken, endToken).to(device)
-    input_size_decoder = len(targetWord2ind)
-    print (input_size_decoder)
-    decoder = model.Decoder (input_size_decoder, embedding_size, hidden_size,input_size_decoder,targetWord2ind, unkToken, padToken, endToken).to(device)
-    nmt = model.NMTmodel(encoder, decoder,targetWord2ind, sourceWord2ind).to(device)
+    
+    nmt = model.NMTmodel(embedding_size, hidden_size, targetWord2ind, sourceWord2ind, startToken, padToken, unkToken, endToken).to(device)
+    
     optimizer = torch.optim.Adam(nmt.parameters(), lr=learning_rate)
 
     if sys.argv[1] == 'extratrain':
@@ -86,13 +80,10 @@ if len(sys.argv)>1 and (sys.argv[1] == 'train' or sys.argv[1] == 'extratrain'):
             targetBatch = [ targetCorpus[i] for i in idx[b:min(b+batchSize, len(idx))] ]
             
             st = sorted(list(zip(sourceBatch,targetBatch)),key=lambda e: len(e[0]), reverse=True)
-           
             (sourceBatch,targetBatch) = tuple(zip(*st))
             targetWords += sum( len(s)-1 for s in targetBatch )
-            H = nmt(sourceBatch,targetBatch)
             optimizer.zero_grad()
-            #print("H shape: ", H.shape)
-            #print("H: ", H)
+            H = nmt(sourceBatch,targetBatch)
             H.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(nmt.parameters(), clip_grad)
             optimizer.step()
@@ -157,12 +148,8 @@ if len(sys.argv)>3 and sys.argv[1] == 'translate':
     (sourceWord2ind,targetWord2ind) = pickle.load(open(wordsDataFileName, 'rb'))
 
     sourceTest = utils.readCorpus(sys.argv[2])
-    #model = nn.DataParallel(model)
-    encoder = model.Encoder (len(sourceWord2ind), embedding_size, hidden_size, sourceWord2ind, unkToken, padToken, endToken).to(device)
-    input_size_decoder = len(targetWord2ind)
-    print (input_size_decoder)
-    decoder = model.Decoder (input_size_decoder, embedding_size, hidden_size,input_size_decoder,targetWord2ind, unkToken, padToken, endToken).to(device)
-    nmt = model.NMTmodel(encoder, decoder,targetWord2ind, sourceWord2ind).to(device)
+
+    nmt = model.NMTmodel(parameter1, parameter2, parameter3,  parameter4).to(device)
     nmt.load(modelFileName)
 
     nmt.eval()
@@ -170,9 +157,7 @@ if len(sys.argv)>3 and sys.argv[1] == 'translate':
     pb = utils.progressBar()
     pb.start(len(sourceTest))
     for s in sourceTest:
-        #file.write
-        print(s)
-        print((' '.join(nmt.translateSentence(s))+"\n"))
+        file.write(' '.join(nmt.translateSentence(s))+"\n")
         pb.tick()
     pb.stop()
 
