@@ -11,6 +11,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from parameters import device
 
 class NMTmodel(torch.nn.Module):
     def preparePaddedBatch(self, source, word2ind, unkTokenIdx, padTokenIdx ):
@@ -85,5 +86,54 @@ class NMTmodel(torch.nn.Module):
 
         return F.cross_entropy(outputTarget, bgBatch[1:].flatten(0, 1), ignore_index=self.padTokenIdxBg)
 
-    def translateSentence(self, sentence, limit=1000):
-        return result
+    def translateSentence(self, sentence, max_length=1000):
+    # print(sentence)
+
+    # sys.exit()
+        def getWordFromIdx(dictionary, idx):
+            if idx in dictionary.keys():
+                return dictionary[idx]
+            return 2
+    # Load german tokenizer
+        english = self.word2indEn
+        bulgarian = self.word2indBg
+        revBulgarian ={v:k for k, v in bulgarian.items()}
+
+        # Convert to Tensor
+        #sentence_tensor = torch.LongTensor(tokens).unsqueeze(1).to(device)
+
+        #print(self.startTokenIdxBg)
+        #print(bulgarian)
+        #print(revBulgarian[self.startTokenIdxBg])
+        # Build encoder hidden, cell state
+        with torch.no_grad():
+            enBatch = self.preparePaddedBatch([sentence], self.word2indEn, self.unkTokenIdxEn, self.padTokenIdxEn)
+            enEmbedded = self.embedEn(enBatch)
+            outputEnc, (hidden, cell) = self.encoder(
+                enEmbedded)
+
+        outputs = []
+        input = torch.tensor([[self.startTokenIdxBg]], device=device)
+        output = outputEnc
+        for _ in range(max_length):
+            embedInput = self.embedBg(input)
+            output, (hidden, cell) = self.decoder(embedInput,  (hidden, cell))
+
+            attentionWeights = F.softmax((torch.bmm(outputEnc.permute(1, 0, 2), output.permute(1, 2, 0))), dim=1)
+            contextVector = torch.bmm(outputEnc.permute(1, 2, 0), attentionWeights).permute(2, 0, 1)
+            outputTarget = self.attention(torch.cat((contextVector, output), dim=-1))
+ 
+            outputTarget = self.projection(self.dropout(outputTarget.flatten(0, 1)))
+            topv, topi = outputTarget.data.topk(1)
+            currentWordIndex = topi[0].item()
+ 
+            if currentWordIndex == self.endTokenIdxBg:
+                break
+            else:
+                outputs.append(revBulgarian[currentWordIndex])
+                input = torch.tensor([[currentWordIndex]], device=device)
+
+        
+        translated_sentence = outputs
+    # remove start token
+        return translated_sentence[1:]

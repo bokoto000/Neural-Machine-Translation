@@ -149,7 +149,7 @@ if len(sys.argv)>3 and sys.argv[1] == 'translate':
 
     sourceTest = utils.readCorpus(sys.argv[2])
 
-    nmt = model.NMTmodel(parameter1, parameter2, parameter3,  parameter4).to(device)
+    nmt = model.NMTmodel(embedding_size, hidden_size, targetWord2ind, sourceWord2ind, startToken, padToken, unkToken, endToken).to(device)
     nmt.load(modelFileName)
 
     nmt.eval()
